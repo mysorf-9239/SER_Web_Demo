@@ -8,3 +8,4 @@ scikit-learn==1.6.1
 soundfile==0.13.1
 scipy==1.13.1
 requests==2.32.3
+gdown==4.6.4

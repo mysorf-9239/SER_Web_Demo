@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 import os
+import gdown
 import librosa
 import tempfile
 import numpy as np
@@ -8,7 +9,20 @@ import tensorflow as tf
 app = Flask(__name__)
 
 # Load model 1 lần duy nhất khi server khởi động
-model = tf.keras.models.load_model('emotion_model.keras')
+MODEL_PATH = 'emotion_model.keras'
+MODEL_GDRIVE_URL = 'https://drive.google.com/uc?id=1SKMhP25iVSD_97thVB8rHB1jpNdknsVC'
+
+# Hàm tải model từ Google Drive nếu chưa có
+def download_model():
+    if not os.path.exists(MODEL_PATH):
+        print("Downloading model from Google Drive...")
+        gdown.download(MODEL_GDRIVE_URL, MODEL_PATH, quiet=False)
+    else:
+        print("Model already exists locally.")
+
+# Tải model
+download_model()
+model = tf.keras.models.load_model(MODEL_PATH)
 
 # Các nhãn cảm xúc tương ứng output của model
 labels = ['neutral', 'happy', 'sad', 'angry', 'fear', 'disgust', 'surprise', 'calm']

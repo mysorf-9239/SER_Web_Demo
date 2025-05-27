@@ -1,125 +1,174 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <title>Dự đoán cảm xúc từ file audio</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f7f9fc;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 2rem;
-      color: #333;
-    }
+    <meta charset="UTF-8"/>
+    <title>Dự đoán cảm xúc từ file audio</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f7f9fc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            color: #333;
+        }
 
-    h1 {
-      color: #2c3e50;
-      margin-bottom: 1.5rem;
-    }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+        }
 
-    form {
-      background: white;
-      padding: 2rem;
-      border-radius: 8px;
-      box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1rem;
-      width: 320px;
-    }
+        form {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            width: 320px;
+        }
 
-    input[type="file"] {
-      border: 1px solid #ccc;
-      padding: 0.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-      width: 100%;
-    }
+        input[type="file"], button[type="button"] {
+            border: 1px solid #ccc;
+            padding: 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 1rem;
+        }
 
-    input[type="submit"] {
-      background-color: #3498db;
-      border: none;
-      padding: 0.7rem 1.5rem;
-      border-radius: 5px;
-      color: white;
-      font-weight: bold;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-      width: 100%;
-    }
+        input[type="submit"] {
+            background-color: #3498db;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            width: 100%;
+        }
 
-    input[type="submit"]:hover {
-      background-color: #2980b9;
-    }
+        input[type="submit"]:hover {
+            background-color: #2980b9;
+        }
 
-    #result {
-      margin-top: 1.5rem;
-      min-height: 1.5rem;
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: #34495e;
-      text-align: center;
-    }
+        #result {
+            margin-top: 1.5rem;
+            min-height: 1.5rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #34495e;
+            text-align: center;
+        }
 
-    /* Spinner */
-    .spinner {
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #3498db;
-      border-radius: 50%;
-      width: 24px;
-      height: 24px;
-      animation: spin 1s linear infinite;
-      display: inline-block;
-      vertical-align: middle;
-      margin-left: 8px;
-    }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
 
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-  </style>
+        @keyframes spin {
+            0% {transform: rotate(0deg);}
+            100% {transform: rotate(360deg);}
+        }
+
+        audio {
+            margin-top: 1rem;
+            width: 100%;
+        }
+    </style>
 </head>
 <body>
-  <h1>Upload file audio để dự đoán cảm xúc</h1>
-  <form method="POST" action="/predict" enctype="multipart/form-data" id="uploadForm">
-    <input type="file" name="audio_file" accept="audio/*" required />
-    <input type="submit" value="Dự đoán" />
-  </form>
+<h1>Upload hoặc ghi âm để dự đoán cảm xúc</h1>
+<form method="POST" action="/predict" enctype="multipart/form-data" id="uploadForm">
+    <input type="file" name="audio_file" accept="audio/*"/>
+    <button type="button" id="recordBtn">🎤 Ghi âm</button>
+    <input type="submit" value="Dự đoán"/>
+</form>
 
-  <div id="result"></div>
+<audio id="audioPlayback" controls style="display:none;"></audio>
+<div id="result"></div>
 
-  <script>
+<script>
     const form = document.getElementById('uploadForm');
     const resultDiv = document.getElementById('result');
+    const recordBtn = document.getElementById('recordBtn');
+    const audioPlayback = document.getElementById('audioPlayback');
+    const fileInput = document.querySelector('input[type="file"]');
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+    let mediaRecorder = null;
+    let audioChunks = [];
 
-      const formData = new FormData(form);
-
-      resultDiv.innerHTML = 'Đang xử lý... <span class="spinner"></span>';
-
-      try {
-        const response = await fetch('/predict', {
-          method: 'POST',
-          body: formData
-        });
-        const data = await response.json();
-
-        if (response.ok) {
-          resultDiv.textContent = `Kết quả dự đoán: ${data.label} (độ tin cậy: ${(data.confidence * 100).toFixed(2)}%)`;
+    recordBtn.addEventListener('click', async () => {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+            recordBtn.textContent = "🎤 Ghi âm";
         } else {
-          resultDiv.textContent = `Lỗi: ${data.error}`;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = e => {
+                    audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: "audio/webm" }); // hoặc 'audio/wav' nếu trình duyệt hỗ trợ
+                    audioChunks = [];
+
+                    const file = new File([blob], "recording.webm", { type: "audio/webm" });
+
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    fileInput.files = dataTransfer.files;
+
+                    const audioURL = URL.createObjectURL(blob);
+                    audioPlayback.src = audioURL;
+                    audioPlayback.style.display = "block";
+                };
+
+                audioChunks = [];
+                mediaRecorder.start();
+                recordBtn.textContent = "⏹ Dừng";
+            } catch (err) {
+                alert("Không thể truy cập microphone: " + err.message);
+            }
         }
-      } catch (error) {
-        resultDiv.textContent = `Lỗi mạng hoặc server: ${error.message}`;
-      }
     });
-  </script>
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+        resultDiv.innerHTML = 'Đang xử lý... <span class="spinner"></span>';
+
+        try {
+            const response = await fetch("/predict", {
+                method: "POST",
+                body: formData,
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                resultDiv.textContent = `Kết quả dự đoán: ${data.label} (độ tin cậy: ${(data.confidence * 100).toFixed(2)}%)`;
+            } else {
+                resultDiv.textContent = `Lỗi: ${data.error}`;
+            }
+        } catch (error) {
+            resultDiv.textContent = `Lỗi mạng hoặc server: ${error.message}`;
+        }
+    });
+</script>
 </body>
 </html>
